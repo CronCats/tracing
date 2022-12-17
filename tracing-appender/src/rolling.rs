@@ -154,6 +154,43 @@ impl RollingFileAppender {
             .expect("initializing rolling file appender failed")
     }
 
+    /// Creates a new `RollingFileAppender` with max backlog of files.
+    ///
+    /// A `RollingFileAppender` will have a fixed rotation whose frequency is
+    /// defined by [`Rotation`]. The `directory` and
+    /// `file_name_prefix` arguments determine the location and file name's _prefix_
+    /// of the log file. `RollingFileAppender` will automatically append the current date
+    /// and hour (UTC format) to the file name.
+    ///
+    /// Additional parameters can be configured using [`RollingFileAppender::builder`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # fn docs() {
+    /// use tracing_appender::rolling::{RollingFileAppender, Rotation};
+    /// let file_appender = RollingFileAppender::new_with_max_files(Rotation::HOURLY, "/some/directory", "prefix.log", 5);
+    /// # }
+    /// ```
+    pub fn new_with_max_files(
+        rotation: Rotation,
+        directory: impl AsRef<Path>,
+        filename_prefix: impl AsRef<Path>,
+        max_files: usize,
+    ) -> RollingFileAppender {
+        let filename_prefix = filename_prefix
+            .as_ref()
+            .to_str()
+            .expect("filename prefix must be a valid UTF-8 string");
+
+        Self::builder()
+            .rotation(rotation)
+            .filename_prefix(filename_prefix)
+            .max_log_files(max_files)
+            .build(directory)
+            .expect("initializing rolling file appender failed")    
+    }
+
     /// Returns a new [`Builder`] for configuring a `RollingFileAppender`.
     ///
     /// The builder interface can be used to set additional configuration
@@ -400,6 +437,22 @@ pub fn daily(
 pub fn never(directory: impl AsRef<Path>, file_name: impl AsRef<Path>) -> RollingFileAppender {
     RollingFileAppender::new(Rotation::NEVER, directory, file_name)
 }
+
+// TODO: Probably don't use a macro here, but it's a good way to avoid code duplication.
+// Don't think the devs will like it though.
+macro_rules! define_rotation_with_max_files {
+    ($rotation_name:ident, $rotation_variant:expr) => {
+        /// Creates a file appender that rotates based on the specified `Rotation` and
+        /// keeps a maximum of `max_files` files.
+        pub fn $rotation_name(directory: impl AsRef<Path>, file_name_prefix: impl AsRef<Path>, max_files: usize) -> RollingFileAppender {
+            RollingFileAppender::new_with_max_files($rotation_variant, directory, file_name_prefix, max_files)
+        }
+    };
+}
+
+define_rotation_with_max_files!(minutely_with_max_files, Rotation::MINUTELY);
+define_rotation_with_max_files!(hourly_with_max_files, Rotation::HOURLY);
+define_rotation_with_max_files!(daily_with_max_files, Rotation::DAILY);
 
 /// Defines a fixed period for rolling of a log file.
 ///
